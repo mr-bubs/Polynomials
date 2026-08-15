@@ -42,10 +42,26 @@
     color: var(--paper);
   }
 
-  header .chapter {
-    font-size: 12px;
+  header .chapter-select {
+    appearance: none;
+    -webkit-appearance: none;
+    background: rgba(255, 90, 54, 0.12);
     color: var(--accent);
+    border: 1px solid rgba(255, 90, 54, 0.4);
+    border-radius: 6px;
+    padding: 6px 28px 6px 12px;
+    font-size: 12px;
+    font-weight: 600;
     letter-spacing: 0.05em;
+    font-family: inherit;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M0 0l5 6 5-6z' fill='%23ff5a36'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+  }
+
+  header .chapter-select:focus {
+    outline: none;
+    border-color: var(--accent);
   }
 
   main {
@@ -82,7 +98,9 @@
 
 <header>
   <span class="title">Polynomials</span>
-  <span class="chapter">Ch. 01</span>
+  <select class="chapter-select" id="chapter-select">
+    <option value="" disabled selected>Chapter</option>
+  </select>
 </header>
 
 <main id="pages"></main>
@@ -98,6 +116,13 @@
   const GITHUB_REPO = "Polynomials";
   const FOLDER = "pages";
   const IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp"];
+
+  // ⬇️ Add a new line here each time a new chapter starts.
+  // "startPage" is the position of that chapter's first page in the
+  // pages folder, counting from 1 (e.g. page-03.png = startPage: 3).
+  const CHAPTERS = [
+    { label: "Chapter 1", startPage: 3 },
+  ];
 
   async function loadPages() {
     const main = document.getElementById("pages");
@@ -119,19 +144,40 @@
         return;
       }
 
-      images.forEach(file => {
+      images.forEach((file, i) => {
         const img = document.createElement("img");
         img.src = file.download_url;
         img.alt = file.name;
         img.loading = "lazy";
+        img.dataset.pageNum = i + 1; // 1-indexed position in the pages folder
         main.appendChild(img);
       });
 
       endMarker.style.display = "block";
+      setupChapterDropdown();
     } catch (err) {
       main.innerHTML = `<div class="end-marker"><span></span>Couldn't load pages — check GITHUB_USER/GITHUB_REPO in the script.</div>`;
       console.error(err);
     }
+  }
+
+  function setupChapterDropdown() {
+    const select = document.getElementById("chapter-select");
+
+    CHAPTERS.forEach((ch, i) => {
+      const opt = document.createElement("option");
+      opt.value = ch.startPage;
+      opt.textContent = ch.label;
+      select.appendChild(opt);
+    });
+
+    select.addEventListener("change", () => {
+      const pageNum = select.value;
+      const target = document.querySelector(`img[data-page-num="${pageNum}"]`);
+      if (target) {
+        target.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    });
   }
 
   loadPages();
