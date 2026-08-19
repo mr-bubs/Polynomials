@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Webtoon</title>
+<style>
+  :root {
+    --ink: #0c0c10;
+    --paper: #f4f2ed;
+    --accent: #ff5a36;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--ink);
+    color: var(--paper);
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+
+  header {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+    background: rgba(12, 12, 16, 0.85);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  header a.back {
+    color: var(--paper);
+    opacity: 0.6;
+    text-decoration: none;
+    font-size: 13px;
+    margin-right: 12px;
+  }
+
+  header .title-wrap {
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+  }
+
+  header .title {
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--paper);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  header .chapter-select {
+    appearance: none;
+    -webkit-appearance: none;
+    background: rgba(255, 90, 54, 0.12);
+    color: var(--accent);
+    border: 1px solid rgba(255, 90, 54, 0.4);
+    border-radius: 6px;
+    padding: 6px 28px 6px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    font-family: inherit;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M0 0l5 6 5-6z' fill='%23ff5a36'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    flex-shrink: 0;
+  }
+
+  header .chapter-select:focus {
+    outline: none;
+    border-color: var(--accent);
+  }
+
+  main {
+    max-width: 720px;
+    margin: 0 auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  main img {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  .end-marker {
+    padding: 48px 24px 80px;
+    text-align: center;
+    font-size: 13px;
+    color: rgba(244, 242, 237, 0.5);
+    letter-spacing: 0.04em;
+  }
+
+  .end-marker span {
+    display: block;
+    width: 28px;
+    height: 1px;
+    background: var(--accent);
+    margin: 0 auto 16px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="title-wrap">
+    <a class="back" href="./" title="All webtoons">&larr;</a>
+    <span class="title" id="book-title">Loading…</span>
+  </div>
+  <select class="chapter-select" id="chapter-select">
+    <option value="" disabled selected>Chapter</option>
+  </select>
+</header>
+
+<main id="pages"></main>
+
+<div class="end-marker" id="end-marker" style="display:none;">
+  <span></span>
+  <span id="end-label">End of chapter</span>
+</div>
+
+<script>
+  // ⬇️ Repo is shared across all books — only the folder/config changes per book.
+  const GITHUB_USER = "mr-bubs";
+  const GITHUB_REPO = "graphic-novels";
+  const IMAGE_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp"];
+
+  // ⬇️ Add a new entry here whenever you start a new webtoon.
+  // key = the value used in the URL, e.g. viewer.html?book=polynomials
+  const BOOKS = {
+    "polynomials": {
+      title: "Polynomials",
+      folder: "Polynomials/pages",
+      chapters: [
+        { label: "Chapter 1", startPage: 2 },
+        { label: "Chapter 2", startPage: 13 },
+      ],
+    },
+    "the-assigned": {
+      title: "The Assigned",
+      folder: "Assigned/pages",
+      chapters: [
+        { label: "Chapter 1", startPage: 1 },
+      ],
+    },
+    "art-of-love-and-destruction": {
+      title: "The Art of Love and Destruction",
+      folder: "art-of-love/pages",
+      chapters: [
+        { label: "Chapter 1", startPage: 1 },
+      ],
+    },
+  };
+
+  function getBookKey() {
+    const params = new URLSearchParams(window.location.search);
+    return params.get("book");
+  }
+
+  async function loadPages() {
+    const main = document.getElementById("pages");
+    const endMarker = document.getElementById("end-marker");
+    const endLabel = document.getElementById("end-label");
+    const titleEl = document.getElementById("book-title");
+
+    const key = getBookKey();
+    const book = BOOKS[key];
+
+    if (!book) {
+      titleEl.textContent = "Book not found";
+      main.innerHTML = `<div class="end-marker"><span></span>No book matches "${key || ""}". Check the ?book= link.</div>`;
+      return;
+    }
+
+    titleEl.textContent = book.title;
+    document.title = book.title;
+
+    try {
+      const res = await fetch(
+        `https://api.github.com/repos/${GITHUB_USER}/${GITHUB_REPO}/contents/${book.folder}`
+      );
+      if (!res.ok) throw new Error("Could not read pages folder");
+      const files = await res.json();
+
+      const images = files
+        .filter(f => IMAGE_EXTENSIONS.some(ext => f.name.toLowerCase().endsWith(ext)))
+        .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+
+      if (images.length === 0) {
+        main.innerHTML = `<div class="end-marker"><span></span>No pages yet</div>`;
+        return;
+      }
+
+      images.forEach((file, i) => {
+        const img = document.createElement("img");
+        img.src = file.download_url;
+        img.alt = file.name;
+        img.loading = "lazy";
+        img.dataset.pageNum = i + 1; // 1-indexed position in the pages folder
+        main.appendChild(img);
+      });
+
+      const lastChapterLabel = book.chapters.length
+        ? book.chapters[book.chapters.length - 1].label
+        : "";
+      endLabel.textContent = lastChapterLabel ? `End of ${lastChapterLabel}` : "End";
+      endMarker.style.display = "block";
+
+      setupChapterDropdown(book);
+    } catch (err) {
+      main.innerHTML = `<div class="end-marker"><span></span>Couldn't load pages — check the repo/folder config.</div>`;
+      console.error(err);
+    }
+  }
+
+  function setupChapterDropdown(book) {
+    const select = document.getElementById("chapter-select");
+
+    book.chapters.forEach((ch) => {
+      const opt = document.createElement("option");
+      opt.value = ch.startPage;
+      opt.textContent = ch.label;
+      select.appendChild(opt);
+    });
+
+    select.addEventListener("change", () => {
+      const pageNum = select.value;
+      const target = document.querySelector(`img[data-page-num="${pageNum}"]`);
+      if (target) {
+        target.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    });
+  }
+
+  loadPages();
+</script>
+
+</body>
+</html>
